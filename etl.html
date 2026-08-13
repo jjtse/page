@@ -1,7 +1,251 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>湖倉調整－中台批次因應方案討論</title>
-<style>*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#263238;font-family:"Microsoft JhengHei","Noto Sans TC",Arial,sans-serif;line-height:1.65}.wrap{max-width:1000px;margin:28px auto;padding:0 18px}.head{background:#17365d;color:#fff;padding:26px 30px;border-radius:12px;margin-bottom:18px}.head h1{margin:0 0 6px;font-size:26px}.head p{margin:0;opacity:.9}.card{background:#fff;padding:22px 26px;border-radius:11px;margin-bottom:16px;box-shadow:0 2px 7px rgba(0,0,0,.06)}h2{font-size:19px;color:#17365d;margin:0 0 13px;border-left:5px solid #2f75b5;padding-left:10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#17365d;color:#fff;padding:11px}td{padding:13px 11px;border-bottom:1px solid #dfe5ea;vertical-align:top}.focus{background:#eef6fc}.high{color:#b3261e;font-weight:700}.mid{color:#a66300;font-weight:700}.low{color:#237a3b;font-weight:700}.question{background:#eef6fc;border:2px solid #2f75b5}.big{font-size:18px;font-weight:700;color:#17365d}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}.good,.risk{border-radius:9px;padding:16px 18px}.good{background:#eef7ee}.risk{background:#fff4e5}.good h3,.risk h3{margin:0 0 8px;font-size:17px}.good h3{color:#237a3b}.risk h3{color:#986200}ul{margin:5px 0;padding-left:21px}li{margin-bottom:7px}.example{background:#fff;border:1px solid #d7e0e8;border-radius:8px;padding:13px 16px;margin-top:12px}.decision{background:#17365d;color:#fff;padding:20px 24px;border-radius:10px;font-size:18px;font-weight:700;text-align:center}.small{font-size:13px;color:#607080}@media(max-width:700px){.grid{grid-template-columns:1fr}.card{overflow-x:auto}}</style></head>
-<body><div class="wrap"><div class="head"><h1>湖倉調整－中台批次因應方案討論</h1><p>湖倉年底後不再維護log_status table，需調整現行批次處理方式。</p></div>
-<div class="card"><h2>一、目前狀況</h2><p>中台目前是<strong>每天固定時間執行</strong>，執行前會先確認湖倉資料是否已到齊，確認後才進行資料同步。</p></div>
-<div class="card"><h2>二、三個處理方案</h2><table><tr><th style="width:22%">方案</th><th>作法</th><th style="width:25%">異動程度</th></tr><tr><td><strong>A. File Trigger</strong></td><td>湖倉資料到齊後通知中台執行。</td><td><span class="high">高</span><br><span class="small">需拆分及調整現有批次</span></td></tr><tr><td><strong>B. Log Center</strong></td><td>中台自行整理湖倉的資料到檔狀態，再依狀態執行。</td><td><span class="mid">中</span><br><span class="small">需新增程式及狀態表</span></td></tr><tr class="focus"><td><strong>C. 取消到檔檢查</strong></td><td>維持目前每天固定時間執行，但不再先確認湖倉資料是否到齊。</td><td><span class="low">低</span><br><span class="small">主要取消既有到檔檢查</span></td></tr></table></div>
-<div class="card question"><h2>三、想討論：方案 C 是否可行？</h2><p class="big">簡單來說：現在是「時間到 → 檢查資料到齊 → 執行」，方案 C 改成「時間到 → 直接執行」。</p><p>資料<strong>還是每天會同步</strong>，主要差異是中台不再等待湖倉確認資料到齊。</p><div class="grid"><div class="good"><h3>優點</h3><ul><li><strong>改動最少</strong>，不需大幅調整現有批次。</li><li><strong>開發時間較短</strong>，較能配合年底時程。</li></ul></div><div class="risk"><h3>需要接受的影響</h3><ul><li>湖倉資料較晚到時，當次同步會有<strong>時間差</strong>。</li><li>湖倉尚無新資料時，中台仍會執行，可能有部分<strong>無效運算</strong>。</li></ul></div></div><div class="example"><strong>時間差範例：</strong><br>湖倉的 8/12 資料延遲到 8/13 09:00 才到，但中台已於 8/13 02:00 執行，因此 8/13 站台查到的仍會是 8/11 資料。</div></div>
-<div class="decision">如果「資料可能有時間差」及「可能空跑」可以接受，是否可採方案 C，以降低本次修改範圍及年底時程風險？</div></div></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>湖倉調整－中台批次因應方案討論</title>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6f8;
+            color: #263238;
+            font-family: "Microsoft JhengHei", "Noto Sans TC", Arial, sans-serif;
+            line-height: 1.65
+        }
+
+        .wrap {
+            max-width: 1000px;
+            margin: 28px auto;
+            padding: 0 18px
+        }
+
+        .head {
+            background: #17365d;
+            color: #fff;
+            padding: 26px 30px;
+            border-radius: 12px;
+            margin-bottom: 18px
+        }
+
+        .head h1 {
+            margin: 0 0 6px;
+            font-size: 26px
+        }
+
+        .head p {
+            margin: 0;
+            opacity: .9
+        }
+
+        .card {
+            background: #fff;
+            padding: 22px 26px;
+            border-radius: 11px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 7px rgba(0, 0, 0, .06)
+        }
+
+        h2 {
+            font-size: 19px;
+            color: #17365d;
+            margin: 0 0 13px;
+            border-left: 5px solid #2f75b5;
+            padding-left: 10px
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px
+        }
+
+        th {
+            background: #17365d;
+            color: #fff;
+            padding: 11px
+        }
+
+        td {
+            padding: 13px 11px;
+            border-bottom: 1px solid #dfe5ea;
+            vertical-align: top
+        }
+
+        .focus {
+            background: #eef6fc
+        }
+
+        .high {
+            color: #b3261e;
+            font-weight: 700
+        }
+
+        .mid {
+            color: #a66300;
+            font-weight: 700
+        }
+
+        .low {
+            color: #237a3b;
+            font-weight: 700
+        }
+
+        .question {
+            background: #eef6fc;
+            border: 2px solid #2f75b5
+        }
+
+        .big {
+            font-size: 18px;
+            font-weight: 700;
+            color: #17365d
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 14px
+        }
+
+        .good,
+        .risk {
+            border-radius: 9px;
+            padding: 16px 18px
+        }
+
+        .good {
+            background: #eef7ee
+        }
+
+        .risk {
+            background: #fff4e5
+        }
+
+        .good h3,
+        .risk h3 {
+            margin: 0 0 8px;
+            font-size: 17px
+        }
+
+        .good h3 {
+            color: #237a3b
+        }
+
+        .risk h3 {
+            color: #986200
+        }
+
+        ul {
+            margin: 5px 0;
+            padding-left: 21px
+        }
+
+        li {
+            margin-bottom: 7px
+        }
+
+        .example {
+            background: #fff;
+            border: 1px solid #d7e0e8;
+            border-radius: 8px;
+            padding: 13px 16px;
+            margin-top: 12px
+        }
+
+        .decision {
+            background: #17365d;
+            color: #fff;
+            padding: 20px 24px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center
+        }
+
+        .small {
+            font-size: 13px;
+            color: #607080
+        }
+
+        @media(max-width:700px) {
+            .grid {
+                grid-template-columns: 1fr
+            }
+
+            .card {
+                overflow-x: auto
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="head">
+            <h1>湖倉調整－中台批次因應方案討論</h1>
+            <p>湖倉年底後不再維護log_status table，需調整現行批次處理方式。</p>
+        </div>
+        <div class="card">
+            <h2>一、目前狀況</h2>
+            <p>中台目前是<strong>每天固定時間執行</strong>，執行前會先確認湖倉資料是否已到齊，確認後才進行資料同步。</p>
+        </div>
+        <div class="card">
+            <h2>二、三個處理方案</h2>
+            <table>
+                <tr>
+                    <th style="width:22%">方案</th>
+                    <th>作法</th>
+                    <th style="width:25%">異動程度</th>
+                </tr>
+                <tr>
+                    <td><strong>A. File Trigger</strong></td>
+                    <td>湖倉資料到齊後通知中台執行。</td>
+                    <td><span class="high">高</span><br><span class="small">需拆分及調整現有批次</span></td>
+                </tr>
+                <tr>
+                    <td><strong>B. Log Center</strong></td>
+                    <td>中台自行整理湖倉的資料到檔狀態，再依狀態執行。</td>
+                    <td><span class="mid">中</span><br><span class="small">需新增程式及狀態表</span></td>
+                </tr>
+                <tr class="focus">
+                    <td><strong>C. 取消到檔檢查</strong></td>
+                    <td>維持目前每天固定時間執行，但不再先確認湖倉資料是否到齊。</td>
+                    <td><span class="low">低</span><br><span class="small">主要取消既有到檔檢查</span></td>
+                </tr>
+            </table>
+        </div>
+        <div class="card question">
+            <h2>三、綜合評估：建議方案 C</h2>
+            <p class="big">* 唯一可符合年底時程方案</p>
+            <p>簡單來說：現在是「時間到 → 檢查資料到齊 → 執行」，方案 C 改成「時間到 → 直接執行」。</p>
+            <p>資料<strong>還是每天會同步</strong>，主要差異是中台不再等待湖倉確認資料到齊。</p>
+            <div class="grid">
+                <div class="good">
+                    <h3>優點</h3>
+                    <ul>
+                        <li><strong>改動最少</strong>，不需大幅調整現有批次。</li>
+                        <li><strong>開發時間較短</strong>，較能配合年底時程。</li>
+                    </ul>
+                </div>
+                <div class="risk">
+                    <h3>需要接受的影響</h3>
+                    <ul>
+                        <li>湖倉資料較晚到時，當次同步會有<strong>時間差</strong>。</li>
+                        <li>湖倉尚無新資料時，中台仍會執行，可能有部分<strong>無效運算</strong>。</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="example"><strong>時間差範例：</strong><br>湖倉的 8/12 資料延遲到 8/13 09:00 才到，但中台已於 8/13 02:00 執行，因此 8/13
+                站台查到的仍會是 8/11 資料。</div>
+        </div>
+        <div class="decision">如果「資料可能有時間差」及「可能空跑」可以接受，是否可採方案 C，以降低本次修改範圍及年底時程風險？</div>
+    </div>
+</body>
+
+</html>
